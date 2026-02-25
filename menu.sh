@@ -49,8 +49,6 @@ get_system_info() {
     TROJAN_COUNT=$(sqlite3 "$DATABASE" "SELECT COUNT(*) FROM xray_users WHERE protocol='trojan' AND status='active'" 2>/dev/null || echo "0")
 
     # Status services
-    XRAY_STATUS=$(systemctl is-active xray-skynet 2>/dev/null | grep -c "^active$" && echo "ON" || echo "OFF")
-    SSH_STATUS=$(systemctl is-active ssh 2>/dev/null | grep -c "^active$" && echo "ON" || echo "OFF")
     [[ $(systemctl is-active xray-skynet 2>/dev/null) == "active" ]] && XRAY_STATUS="${GREEN}ON${NC}" || XRAY_STATUS="${RED}OFF${NC}"
     [[ $(systemctl is-active ssh 2>/dev/null) == "active" ]] && SSH_STATUS="${GREEN}ON${NC}" || SSH_STATUS="${RED}OFF${NC}"
 }
