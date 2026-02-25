@@ -1,213 +1,24 @@
-# skynetvpn
+# SKYNET VPN (Repo Source)
 
-SkynetVPN is a VPN service with a RESTful API for managing connections, users, and server configurations.
-
-## API Endpoints
-
-### Authentication
-
-#### POST `/api/auth/login`
-Authenticate a user and receive a session token.
-
-**Request Body:**
-```json
-{
-  "username": "string",
-  "password": "string"
-}
+## Install
+```bash
+cd /opt
+git clone https://github.com/evit2601-del/skynetvpn skynetvpn
+cd skynetvpn
+chmod +x install.sh
+sudo bash install.sh
 ```
 
-**Response:**
-```json
-{
-  "token": "string",
-  "expires_at": "ISO 8601 datetime"
-}
-```
+## Multi-login Auto Lock
+- SSH: deteksi dari `who` vs `ip_limit`
+- Xray (VMess/VLESS/Trojan): parse `/var/log/xray/access.log` -> `ip_tracking` vs `ip_limit`
+- Saat melanggar: status jadi `locked`, set `locked_until`
+- Setelah waktunya habis: auto unlock (SSH unlock + Xray client ditambahkan lagi)
 
-#### POST `/api/auth/logout`
-Invalidate the current session token.
+## Menu 23 (Durasi Locked)
+Masuk `FEATURES` -> `23` lalu ketik:
+- `1m` (1 menit)
+- `1h` (1 jam)
+- `1d` (1 hari)
 
-**Headers:**
-- `Authorization: Bearer <token>`
-
-**Response:**
-```json
-{
-  "message": "Logged out successfully"
-}
-```
-
----
-
-### Servers
-
-#### GET `/api/servers`
-List all available VPN servers.
-
-**Headers:**
-- `Authorization: Bearer <token>`
-
-**Response:**
-```json
-[
-  {
-    "id": "string",
-    "name": "string",
-    "country": "string",
-    "ip": "string",
-    "status": "online | offline | maintenance"
-  }
-]
-```
-
-#### GET `/api/servers/{id}`
-Get details for a specific VPN server.
-
-**Headers:**
-- `Authorization: Bearer <token>`
-
-**Path Parameters:**
-- `id` — Server ID
-
-**Response:**
-```json
-{
-  "id": "string",
-  "name": "string",
-  "country": "string",
-  "ip": "string",
-  "status": "online | offline | maintenance",
-  "load": "number (0–100)"
-}
-```
-
----
-
-### Connections
-
-#### POST `/api/connections`
-Start a VPN connection to a server.
-
-**Headers:**
-- `Authorization: Bearer <token>`
-
-**Request Body:**
-```json
-{
-  "server_id": "string",
-  "protocol": "wireguard | openvpn"
-}
-```
-
-**Response:**
-```json
-{
-  "connection_id": "string",
-  "server_id": "string",
-  "status": "connecting",
-  "created_at": "ISO 8601 datetime"
-}
-```
-
-#### GET `/api/connections/{id}`
-Get the status of an active connection.
-
-**Headers:**
-- `Authorization: Bearer <token>`
-
-**Path Parameters:**
-- `id` — Connection ID
-
-**Response:**
-```json
-{
-  "connection_id": "string",
-  "server_id": "string",
-  "status": "connecting | connected | disconnected",
-  "created_at": "ISO 8601 datetime"
-}
-```
-
-#### DELETE `/api/connections/{id}`
-Terminate an active VPN connection.
-
-**Headers:**
-- `Authorization: Bearer <token>`
-
-**Path Parameters:**
-- `id` — Connection ID
-
-**Response:**
-```json
-{
-  "message": "Connection terminated"
-}
-```
-
----
-
-### Users
-
-#### GET `/api/users/me`
-Get the current authenticated user's profile.
-
-**Headers:**
-- `Authorization: Bearer <token>`
-
-**Response:**
-```json
-{
-  "id": "string",
-  "username": "string",
-  "email": "string",
-  "plan": "free | pro | enterprise",
-  "created_at": "ISO 8601 datetime"
-}
-```
-
-#### PATCH `/api/users/me`
-Update the current user's profile.
-
-**Headers:**
-- `Authorization: Bearer <token>`
-
-**Request Body (all fields optional):**
-```json
-{
-  "email": "string",
-  "password": "string"
-}
-```
-
-**Response:**
-```json
-{
-  "id": "string",
-  "username": "string",
-  "email": "string",
-  "plan": "free | pro | enterprise",
-  "updated_at": "ISO 8601 datetime"
-}
-```
-
----
-
-## Error Responses
-
-All endpoints return errors in the following format:
-
-```json
-{
-  "error": "string",
-  "code": "number"
-}
-```
-
-| HTTP Status | Meaning                        |
-|-------------|-------------------------------|
-| 400         | Bad Request                   |
-| 401         | Unauthorized                  |
-| 403         | Forbidden                     |
-| 404         | Not Found                     |
-| 500         | Internal Server Error         |
+Disimpan di SQLite: `settings.lock_duration_seconds`
