@@ -1,4 +1,4 @@
-# SKYNET VPN (Repo Source)
+# SKYNET TUNNELING (Repo Source)
 
 ## Install
 ```bash
