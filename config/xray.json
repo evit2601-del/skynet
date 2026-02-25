@@ -4,23 +4,6 @@
     "access": "/var/log/xray/access.log",
     "error": "/var/log/xray/error.log"
   },
-  "stats": {},
-  "api": {
-    "tag": "api",
-    "services": ["HandlerService", "LoggerService", "StatsService"]
-  },
-  "policy": {
-    "levels": {
-      "0": {
-        "statsUserUplink": true,
-        "statsUserDownlink": true
-      }
-    },
-    "system": {
-      "statsInboundUplink": true,
-      "statsInboundDownlink": true
-    }
-  },
   "inbounds": [
     {
       "tag": "vmess-ws",
@@ -90,11 +73,6 @@
   ],
   "routing": {
     "rules": [
-      {
-        "inboundTag": ["api"],
-        "outboundTag": "api",
-        "type": "field"
-      },
       {
         "type": "field",
         "ip": ["geoip:private"],
