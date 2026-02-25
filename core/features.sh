@@ -161,6 +161,7 @@ feature_check_services() {
         ["Bot Telegram"]="skynet-bot"
         ["REST API"]="skynet-api"
         ["BadVPN"]="badvpn-udpgw"
+        ["NKN Tunnel"]="skynet-nkn"
     )
 
     for NAME in "${!SVCS[@]}"; do
@@ -583,7 +584,7 @@ feature_start_stop_service() {
     clear
     echo -e "${CYAN}${BOLD}━━━━━━━━━━ START/STOP SERVICE ━━━━━━━━━━${NC}"
     echo ""
-    local SVCS=("ssh" "dropbear" "nginx" "xray-skynet" "fail2ban" "stunnel4" "skynet-bot" "skynet-api" "badvpn-udpgw")
+    local SVCS=("ssh" "dropbear" "nginx" "xray-skynet" "fail2ban" "stunnel4" "skynet-bot" "skynet-api" "badvpn-udpgw" "skynet-nkn")
     for i in "${!SVCS[@]}"; do
         STATUS=$(systemctl is-active "${SVCS[$i]}" 2>/dev/null)
         [[ "$STATUS" == "active" ]] && STAT="${GREEN}ON${NC}" || STAT="${RED}OFF${NC}"
@@ -896,6 +897,133 @@ feature_system_info() {
 }
 
 # ══════════════════════════════════════════
+# 22. NKN TUNNEL (DECENTRALIZED)
+# ══════════════════════════════════════════
+feature_nkn() {
+    clear
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━ NKN TUNNEL (DECENTRALIZED) ━━━━━━━━━━${NC}"
+    echo ""
+    echo -e " ${GREEN}1.)${NC} Install NKN Tunnel"
+    echo -e " ${GREEN}2.)${NC} Start NKN Tunnel"
+    echo -e " ${GREEN}3.)${NC} Stop NKN Tunnel"
+    echo -e " ${GREEN}4.)${NC} Status & NKN Address"
+    echo -e " ${GREEN}5.)${NC} Set Local Port"
+    echo -e " ${RED}x.)${NC} Kembali"
+    echo ""
+    echo -ne " ${YELLOW}Pilihan:${NC} "; read -r OPT
+
+    case "$OPT" in
+        1)
+            echo -e "${YELLOW}Menginstall NKN Tunnel...${NC}"
+            NKN_ARCH="linux-amd64"
+            NKN_URL="https://github.com/nknorg/nkn-tunnel/releases/latest/download/nkn-tunnel-${NKN_ARCH}.tar.gz"
+            cd /tmp
+            if wget -qO nkn-tunnel.tar.gz "$NKN_URL" && tar -xzf nkn-tunnel.tar.gz 2>/dev/null; then
+                # binary name may vary; try common names
+                for BIN in nkn-tunnel nkn-tunnel-linux-amd64; do
+                    [[ -f "/tmp/$BIN" ]] && mv "/tmp/$BIN" /usr/local/bin/nkn-tunnel && break
+                done
+                chmod +x /usr/local/bin/nkn-tunnel 2>/dev/null || true
+            else
+                echo -e "${RED}Gagal download NKN Tunnel!${NC}"
+                echo -e "${YELLOW}Download manual: https://github.com/nknorg/nkn-tunnel/releases${NC}"
+                echo -ne " ${YELLOW}[Enter] Kembali...${NC}"; read -r
+                feature_nkn; return
+            fi
+
+            # Siapkan direktori config NKN
+            NKN_CONF_DIR="/opt/skynet/config/nkn"
+            mkdir -p "$NKN_CONF_DIR"
+
+            # Default local port yang di-tunnel
+            NKN_LOCAL_PORT=22
+            echo "$NKN_LOCAL_PORT" > "$NKN_CONF_DIR/local_port"
+
+            # Buat systemd service
+            cat > /etc/systemd/system/skynet-nkn.service << EOF
+[Unit]
+Description=SKYNET - NKN Tunnel Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/nkn-tunnel -server -local-port ${NKN_LOCAL_PORT}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+            systemctl daemon-reload
+            systemctl enable skynet-nkn
+            systemctl start skynet-nkn
+            sleep 2
+
+            if systemctl is-active skynet-nkn &>/dev/null; then
+                echo -e "${GREEN}✔ NKN Tunnel berhasil diinstall dan distart!${NC}"
+            else
+                echo -e "${YELLOW}NKN Tunnel diinstall. Start dengan opsi 2.${NC}"
+            fi
+            ;;
+        2)
+            if ! command -v nkn-tunnel &>/dev/null; then
+                echo -e "${RED}NKN Tunnel belum diinstall! Gunakan opsi 1 terlebih dahulu.${NC}"
+            else
+                systemctl start skynet-nkn && \
+                    echo -e "${GREEN}✔ NKN Tunnel started!${NC}" || \
+                    echo -e "${RED}Gagal start NKN Tunnel!${NC}"
+            fi
+            ;;
+        3)
+            systemctl stop skynet-nkn 2>/dev/null && \
+                echo -e "${GREEN}✔ NKN Tunnel stopped!${NC}" || \
+                echo -e "${RED}NKN Tunnel tidak berjalan.${NC}"
+            ;;
+        4)
+            echo -e "${YELLOW}Status NKN Tunnel:${NC}"
+            systemctl status skynet-nkn --no-pager 2>/dev/null || echo -e "${RED}Service tidak ditemukan.${NC}"
+            echo ""
+            # Tampilkan NKN address dari log jika tersedia
+            NKN_ADDR=$(journalctl -u skynet-nkn --no-pager -n 50 2>/dev/null | \
+                grep -oE '[0-9a-f]{64}\.' | head -1 | tr -d '.')
+            if [[ -n "$NKN_ADDR" ]]; then
+                echo -e "${YELLOW}NKN Address (untuk client):${NC}"
+                echo -e " ${GREEN}$NKN_ADDR${NC}"
+                if command -v qrencode &>/dev/null; then
+                    echo ""
+                    echo "$NKN_ADDR" | qrencode -t ANSIUTF8
+                fi
+            else
+                echo -e "${YELLOW}NKN Address akan tampil setelah service berjalan.${NC}"
+                echo -e " Jalankan: ${CYAN}journalctl -u skynet-nkn -f${NC}"
+            fi
+            ;;
+        5)
+            NKN_CONF_DIR="/opt/skynet/config/nkn"
+            CURRENT_PORT=$(cat "$NKN_CONF_DIR/local_port" 2>/dev/null || echo "22")
+            echo -e " Port lokal saat ini: ${YELLOW}$CURRENT_PORT${NC}"
+            echo -ne " Port lokal baru (default 22): "; read -r NKN_PORT
+            NKN_PORT=${NKN_PORT:-22}
+            if ! [[ "$NKN_PORT" =~ ^[0-9]+$ ]] || [[ "$NKN_PORT" -lt 1 ]] || [[ "$NKN_PORT" -gt 65535 ]]; then
+                echo -e "${RED}Port tidak valid!${NC}"; sleep 2; feature_nkn; return
+            fi
+            mkdir -p "$NKN_CONF_DIR"
+            echo "$NKN_PORT" > "$NKN_CONF_DIR/local_port"
+            sed -i "s/-local-port [0-9]*/-local-port $NKN_PORT/" \
+                /etc/systemd/system/skynet-nkn.service 2>/dev/null || true
+            systemctl daemon-reload
+            systemctl restart skynet-nkn 2>/dev/null || true
+            echo -e "${GREEN}✔ NKN Tunnel diset ke port lokal: $NKN_PORT${NC}"
+            ;;
+        x|X) features_menu; return ;;
+        *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1; feature_nkn; return ;;
+    esac
+    echo -ne " ${YELLOW}[Enter] Kembali...${NC}"; read -r
+    feature_nkn
+}
+
+# ══════════════════════════════════════════
 # MENU FEATURES UTAMA
 # ══════════════════════════════════════════
 features_menu() {
@@ -949,13 +1077,14 @@ features_menu() {
     echo -e " ${GREEN}19.)${NC}  SlowDNS"
     echo -e " ${GREEN}20.)${NC}  Set Auto Update"
     echo -e " ${GREEN}21.)${NC}  Information System"
+    echo -e " ${GREEN}22.)${NC}  NKN Tunnel (Decentralized)"
     echo ""
     echo -e "${CYAN}────────────────────────────────────────────${NC}"
     echo ""
-    echo -e " ${YELLOW}22.)${NC}  Back to Menu"
+    echo -e " ${YELLOW}23.)${NC}  Back to Menu"
     echo -e " ${RED}  x.)${NC}  Exit"
     echo ""
-    echo -ne " ${YELLOW}Pilihan [1-22/x]:${NC} "; read -r choice
+    echo -ne " ${YELLOW}Pilihan [1-23/x]:${NC} "; read -r choice
 
     case "$choice" in
         1)  feature_bandwidth ;;
@@ -979,7 +1108,8 @@ features_menu() {
         19) feature_slowdns ;;
         20) feature_auto_update ;;
         21) feature_system_info ;;
-        22) source /opt/skynet/menu.sh; show_main_menu ;;
+        22) feature_nkn ;;
+        23) source /opt/skynet/menu.sh; show_main_menu ;;
         x|X) clear; exit 0 ;;
         *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1; features_menu ;;
     esac
