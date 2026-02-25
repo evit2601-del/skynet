@@ -133,14 +133,13 @@ auto_unlock_expired_locks() {
         log_monitor "AUTO_UNLOCK: SSH $USERNAME"
     done
 
-    sqlite3 "$DATABASE" \
-      "SELECT username, uuid, protocol FROM xray_users WHERE status='locked' AND locked_until IS NOT NULL AND locked_until <= '$NOW'" 2>/dev/null | \
     while IFS='|' read -r USERNAME UUID PROTO; do
         _xray_add_client "$PROTO" "$UUID" "$USERNAME"
         sqlite3 "$DATABASE" "UPDATE xray_users SET status='active', locked_until=NULL WHERE username='$USERNAME' AND protocol='$PROTO';"
         XRAY_CHANGED=1
         log_monitor "AUTO_UNLOCK: XRAY $PROTO $USERNAME"
-    done
+    done < <(sqlite3 "$DATABASE" \
+      "SELECT username, uuid, protocol FROM xray_users WHERE status='locked' AND locked_until IS NOT NULL AND locked_until <= '$NOW'" 2>/dev/null)
 
     [[ "$XRAY_CHANGED" -eq 1 ]] && systemctl restart xray-skynet 2>/dev/null || true
 }

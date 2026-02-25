@@ -1,0 +1,18 @@
+# Database (contains generated secrets — never commit)
+database/
+*.db
+*.sqlite
+
+# Runtime logs and backups
+logs/
+backup/
+tmp/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment / secrets
+.env
+*.env
