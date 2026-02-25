@@ -199,6 +199,20 @@ check_xray_multi_login() {
     done
 }
 
+check_xray_quota() {
+    local XRAY_CHANGED=0
+    sqlite3 "$DATABASE" \
+      "SELECT username, uuid, protocol FROM xray_users WHERE status='active' AND quota_gb > 0 AND quota_used >= quota_gb" 2>/dev/null | \
+    while IFS='|' read -r USERNAME UUID PROTO; do
+        _xray_remove_client "$PROTO" "$UUID"
+        sqlite3 "$DATABASE" \
+            "UPDATE xray_users SET status='locked' WHERE username='$USERNAME' AND protocol='$PROTO';"
+        XRAY_CHANGED=1
+        log_monitor "QUOTA_LOCK: XRAY $PROTO $USERNAME quota habis, akun di-lock"
+    done
+    [[ "$XRAY_CHANGED" -eq 1 ]] && systemctl restart xray-skynet 2>/dev/null || true
+}
+
 run_daemon() {
     log_monitor "=== Monitor daemon started ==="
     while true; do
@@ -207,6 +221,7 @@ run_daemon() {
         auto_unlock_expired_locks
         sync_xray_ip_tracking
         check_xray_multi_login
+        check_xray_quota
         check_ssh_multi_login
         sleep "$INTERVAL"
     done
@@ -218,6 +233,7 @@ case "${1:-daemon}" in
     auto_unlock_expired_locks
     sync_xray_ip_tracking
     check_xray_multi_login
+    check_xray_quota
     check_ssh_multi_login
     ;;
 esac
