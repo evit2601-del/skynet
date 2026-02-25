@@ -8,7 +8,7 @@
 ## Instalasi
 
 ```bash
-git clone https://github.com/yourrepo/skynet.git /opt/skynet
+git clone https://github.com/evit2601-del/skynet.git /opt/skynet
 cd /opt/skynet
 chmod +x install.sh
 bash install.sh
