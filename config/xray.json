@@ -4,44 +4,102 @@
     "access": "/var/log/xray/access.log",
     "error": "/var/log/xray/error.log"
   },
+  "stats": {},
+  "api": {
+    "tag": "api",
+    "services": ["HandlerService", "LoggerService", "StatsService"]
+  },
+  "policy": {
+    "levels": {
+      "0": {
+        "statsUserUplink": true,
+        "statsUserDownlink": true
+      }
+    },
+    "system": {
+      "statsInboundUplink": true,
+      "statsInboundDownlink": true
+    }
+  },
   "inbounds": [
     {
       "tag": "vmess-ws",
       "port": 10086,
       "protocol": "vmess",
       "settings": { "clients": [] },
-      "streamSettings": { "network": "ws", "wsSettings": { "path": "/vmess" } }
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": { "path": "/vmess" }
+      },
+      "sniffing": { "enabled": true, "destOverride": ["http", "tls"] }
     },
     {
       "tag": "vless-ws",
       "port": 10087,
       "protocol": "vless",
       "settings": { "clients": [], "decryption": "none" },
-      "streamSettings": { "network": "ws", "wsSettings": { "path": "/vless" } }
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": { "path": "/vless" }
+      },
+      "sniffing": { "enabled": true, "destOverride": ["http", "tls"] }
     },
     {
       "tag": "trojan-ws",
       "port": 10088,
       "protocol": "trojan",
       "settings": { "clients": [] },
-      "streamSettings": { "network": "ws", "wsSettings": { "path": "/trojan" } }
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": { "path": "/trojan" }
+      },
+      "sniffing": { "enabled": true, "destOverride": ["http", "tls"] }
     },
     {
       "tag": "vmess-grpc",
       "port": 10089,
       "protocol": "vmess",
       "settings": { "clients": [] },
-      "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "vmess-grpc" } }
+      "streamSettings": {
+        "network": "grpc",
+        "grpcSettings": { "serviceName": "vmess-grpc" }
+      }
     },
     {
       "tag": "vless-grpc",
       "port": 10090,
       "protocol": "vless",
       "settings": { "clients": [], "decryption": "none" },
-      "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "vless-grpc" } }
+      "streamSettings": {
+        "network": "grpc",
+        "grpcSettings": { "serviceName": "vless-grpc" }
+      }
     }
   ],
   "outbounds": [
-    { "tag": "direct", "protocol": "freedom", "settings": {} }
-  ]
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {}
+    },
+    {
+      "tag": "blocked",
+      "protocol": "blackhole",
+      "settings": {}
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "inboundTag": ["api"],
+        "outboundTag": "api",
+        "type": "field"
+      },
+      {
+        "type": "field",
+        "ip": ["geoip:private"],
+        "outboundTag": "blocked"
+      }
+    ]
+  }
 }
