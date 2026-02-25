@@ -35,6 +35,7 @@ bash /opt/skynet/menu.sh
 | HTTP        | 80       |
 | BadVPN UDP  | 7300     |
 | REST API    | 8080 (lokal) |
+| NKN Tunnel  | Decentralized (outbound) |
 
 ## API Usage
 
@@ -78,7 +79,33 @@ curl http://localhost:8080/server-status \
 └── backup/             # Backup files
 ```
 
-## Keamanan
+## NKN Tunnel (Decentralized Messaging)
+
+NKN (New Kind of Network) adalah jaringan peer-to-peer terdesentralisasi. SKYNET mengintegrasikan NKN Tunnel sebagai metode koneksi alternatif.
+
+```bash
+# Buka menu Features > NKN Tunnel (opsi 22) untuk:
+# 1. Install NKN Tunnel
+# 2. Start/Stop service
+# 3. Melihat NKN Address (untuk client)
+# 4. Mengatur port lokal yang di-tunnel
+menu
+```
+
+### Cara Penggunaan Client NKN
+
+Setelah server NKN aktif, client dapat terhubung menggunakan:
+
+```bash
+# Download nkn-tunnel di sisi client
+# https://github.com/nknorg/nkn-tunnel/releases
+
+nkn-tunnel -client -server-address <NKN_ADDRESS> -remote-port 22 -local-port 2022
+# Kemudian SSH ke localhost:2022
+ssh user@localhost -p 2022
+```
+
+
 
 - API Key otomatis di-generate saat install
 - Semua input divalidasi

@@ -827,6 +827,33 @@ EOF
     log "API service berhasil dibuat."
 }
 
+# ── Buat systemd service slot untuk NKN Tunnel
+create_nkn_service_slot() {
+    log "Membuat systemd service slot untuk NKN Tunnel..."
+
+    mkdir -p /opt/skynet/config/nkn
+
+    # Buat service placeholder (disabled by default; diaktifkan via menu Features > NKN Tunnel)
+    cat > /etc/systemd/system/skynet-nkn.service << 'EOF'
+[Unit]
+Description=SKYNET - NKN Tunnel Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/nkn-tunnel -server -local-port 22
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    log "NKN Tunnel service slot berhasil dibuat (install NKN via menu Features > NKN Tunnel)."
+}
+
 # ── Buat systemd service untuk Bot
 create_bot_service() {
     log "Membuat systemd service untuk Bot..."
@@ -992,6 +1019,7 @@ main() {
     create_xray_service
     create_api_service
     create_bot_service
+    create_nkn_service_slot
     create_monitor_service
     create_settings_conf "$DOMAIN"
     deploy_scripts
@@ -1018,6 +1046,7 @@ main() {
     echo "║  HTTPS     : Port 443 (TLS)"
     echo "║  BadVPN    : Port 7300"
     echo "║  API       : http://127.0.0.1:8080"
+    echo "║  NKN Tunnel: Install via menu Features > NKN Tunnel"
     echo "╠══════════════════════════════════════════════════════╣"
     echo "║  Ketik 'menu' untuk membuka panel                    ║"
     echo "╚══════════════════════════════════════════════════════╝"
