@@ -104,8 +104,8 @@ class CreateSSHUserRequest(BaseModel):
 
     @validator("password")
     def validate_password(cls, v):
-        if len(v) < 3:
-            raise ValueError("Password minimal 3 karakter")
+        if len(v) < 6:
+            raise ValueError("Password minimal 6 karakter")
         return v
 
     @validator("days")
