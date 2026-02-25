@@ -1,8 +1,8 @@
-cat > /opt/skynetvpn/install.sh <<'EOF'
 #!/bin/bash
 # ============================================================
-# SKYNET TUNNELING — MAIN INSTALLER
-# Compatible: Ubuntu 20.04 / 22.04 / 24.04
+# SKYNET TUNNELING — MAIN INSTALLER (1 FILE)
+# Ubuntu 20.04 / 22.04 / 24.04
+# Runtime target: /opt/skynet
 # ============================================================
 
 set -euo pipefail
@@ -90,15 +90,17 @@ install_python_deps() {
 }
 
 seed_files_from_repo() {
-  # Asumsi repo ini di-clone ke /opt/skynet, tapi kita jalankan dari folder repo saat ini.
-  # Copy file sumber ke runtime /opt/skynet.
-  log "Copy source repo ke $SKYNET_DIR ..."
+  log "Copy source files to $SKYNET_DIR ..."
+  mkdir -p "$SKYNET_DIR"
   cp -r ./api "$SKYNET_DIR/"
   cp -r ./bot "$SKYNET_DIR/"
   cp -r ./core "$SKYNET_DIR/"
   cp -r ./config "$SKYNET_DIR/"
   cp ./menu.sh "$SKYNET_DIR/menu.sh"
-  chmod +x "$SKYNET_DIR/menu.sh" "$SKYNET_DIR/core/"*.sh "$SKYNET_DIR/core/migrations/"*.sh 2>/dev/null || true
+
+  chmod +x "$SKYNET_DIR/menu.sh" || true
+  chmod +x "$SKYNET_DIR/core/"*.sh 2>/dev/null || true
+  chmod +x "$SKYNET_DIR/core/migrations/"*.sh 2>/dev/null || true
 }
 
 init_db() {
@@ -463,5 +465,3 @@ main() {
 }
 
 main "$@"
-EOF
-chmod +x /opt/skynetvpn/install.sh
