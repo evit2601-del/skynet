@@ -125,22 +125,20 @@ auto_unlock_expired_locks() {
     NOW=$(date +"%Y-%m-%d %H:%M:%S")
     local XRAY_CHANGED=0
 
-    sqlite3 "$DATABASE" \
-      "SELECT username FROM ssh_users WHERE status='locked' AND locked_until IS NOT NULL AND locked_until <= '$NOW'" 2>/dev/null | \
     while read -r USERNAME; do
         passwd -u "$USERNAME" 2>/dev/null || true
         sqlite3 "$DATABASE" "UPDATE ssh_users SET status='active', locked_until=NULL WHERE username='$USERNAME';"
         log_monitor "AUTO_UNLOCK: SSH $USERNAME"
-    done
+    done < <(sqlite3 "$DATABASE" \
+      "SELECT username FROM ssh_users WHERE status='locked' AND locked_until IS NOT NULL AND locked_until <= '$NOW'" 2>/dev/null)
 
-    sqlite3 "$DATABASE" \
-      "SELECT username, uuid, protocol FROM xray_users WHERE status='locked' AND locked_until IS NOT NULL AND locked_until <= '$NOW'" 2>/dev/null | \
     while IFS='|' read -r USERNAME UUID PROTO; do
         _xray_add_client "$PROTO" "$UUID" "$USERNAME"
         sqlite3 "$DATABASE" "UPDATE xray_users SET status='active', locked_until=NULL WHERE username='$USERNAME' AND protocol='$PROTO';"
         XRAY_CHANGED=1
         log_monitor "AUTO_UNLOCK: XRAY $PROTO $USERNAME"
-    done
+    done < <(sqlite3 "$DATABASE" \
+      "SELECT username, uuid, protocol FROM xray_users WHERE status='locked' AND locked_until IS NOT NULL AND locked_until <= '$NOW'" 2>/dev/null)
 
     [[ "$XRAY_CHANGED" -eq 1 ]] && systemctl restart xray-skynet 2>/dev/null || true
 }
@@ -201,16 +199,13 @@ check_xray_multi_login() {
 
 check_xray_quota() {
     local XRAY_CHANGED=0
-    sqlite3 "$DATABASE" \
-      "SELECT username, uuid, protocol FROM xray_users WHERE status='active' AND quota_gb > 0 AND quota_used >= quota_gb" 2>/dev/null | \
-    while IFS='|' read -r USERNAME UUID PROTO; do
-        _xray_remove_client "$PROTO" "$UUID"
-        sqlite3 "$DATABASE" \
-            "UPDATE xray_users SET status='locked' WHERE username='$USERNAME' AND protocol='$PROTO';"
+
+    while IFS='|' read -r USERNAME UUID PROTO QUOTA_USED QUOTA_GB; do
+        lock_xray_user "$USERNAME" "$UUID" "$PROTO" "quota habis (${QUOTA_USED}/${QUOTA_GB}GB)"
         XRAY_CHANGED=1
-        log_monitor "QUOTA_LOCK: XRAY $PROTO $USERNAME quota habis, akun di-lock"
-    done
-    [[ "$XRAY_CHANGED" -eq 1 ]] && systemctl restart xray-skynet 2>/dev/null || true
+        log_monitor "QUOTA_LOCK: XRAY $PROTO $USERNAME quota habis (${QUOTA_USED}/${QUOTA_GB}GB)"
+    done < <(sqlite3 "$DATABASE" \
+      "SELECT username, uuid, protocol, quota_used, quota_gb FROM xray_users WHERE status='active' AND quota_gb > 0 AND quota_used >= quota_gb" 2>/dev/null)
 }
 
 run_daemon() {
