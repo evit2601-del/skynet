@@ -372,18 +372,24 @@ xray_list() {
     clear
     echo -e "${CYAN}${BOLD}━━━━━━━━━━ LIST ${PROTO^^} ACCOUNTS ━━━━━━━━━━${NC}"
     echo ""
-    printf " %-15s %-36s %-12s %-8s\n" "Username" "UUID" "Expired" "Status"
-    echo -e " ${CYAN}─────────────────────────────────────────────────────────────────────${NC}"
+    printf " %-15s %-12s %-16s %-8s %-10s\n" "Username" "Expired" "Quota Used" "IP Lim" "Status"
+    echo -e " ${CYAN}──────────────────────────────────────────────────────────────${NC}"
 
     sqlite3 "$DATABASE" \
-        "SELECT username, uuid, expired_at, status FROM xray_users WHERE protocol='$PROTO' ORDER BY username" | \
-    while IFS='|' read -r UN UUID EXP STAT; do
-        UUID_SHORT="${UUID:0:8}..."
-        printf " %-15s %-36s %-12s %-8s\n" "$UN" "$UUID_SHORT" "$EXP" "$STAT"
+        "SELECT username, expired_at, quota_used, quota_gb, ip_limit, status FROM xray_users WHERE protocol='$PROTO' ORDER BY username" | \
+    while IFS='|' read -r UN EXP QU QUOTA IPN STAT; do
+        QUOTA_DISPLAY="${QU:-0}/${QUOTA}GB"
+        case "$STAT" in
+            active)  STAT_COLOR="${GREEN}${STAT}${NC}" ;;
+            locked)  STAT_COLOR="${RED}${STAT}${NC}" ;;
+            *)       STAT_COLOR="${YELLOW}${STAT}${NC}" ;;
+        esac
+        printf " %-15s %-12s %-16s %-8s " "$UN" "$EXP" "$QUOTA_DISPLAY" "$IPN"
+        echo -e "$STAT_COLOR"
     done
 
     TOTAL=$(sqlite3 "$DATABASE" "SELECT COUNT(*) FROM xray_users WHERE protocol='$PROTO'")
-    echo -e " ${CYAN}─────────────────────────────────────────────────────────────────────${NC}"
+    echo -e " ${CYAN}──────────────────────────────────────────────────────────────${NC}"
     echo -e " Total: ${YELLOW}$TOTAL${NC}"
     echo -ne " ${YELLOW}[Enter] Kembali...${NC}"; read -r
     xray_menu "$PROTO"
@@ -477,6 +483,89 @@ xray_edit_bandwidth() {
     sleep 2; xray_menu "$PROTO"
 }
 
+# ── Monitor koneksi aktif Xray
+xray_monitor_login() {
+    local PROTO=$1
+    clear
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━ MONITOR LOGIN AKTIF ${PROTO^^} ━━━━━━━━━━${NC}"
+    echo ""
+
+    local LOG_FILE="/var/log/xray/access.log"
+    echo -e " ${YELLOW}Koneksi aktif dari access log (20 terakhir):${NC}"
+    echo ""
+    if [[ -f "$LOG_FILE" ]]; then
+        echo -e " ${CYAN}──────────────────────────────────────────────────────────────${NC}"
+        printf " %-20s %-25s %-20s\n" "Email/Username" "IP Asal" "Waktu"
+        echo -e " ${CYAN}──────────────────────────────────────────────────────────────${NC}"
+        tail -n 500 "$LOG_FILE" 2>/dev/null | grep "accepted" | awk '{
+            ts = $1 " " $2
+            email = ""
+            ip = ""
+            for(i=1;i<=NF;i++) {
+                if ($i == "email:") email = $(i+1)
+                if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$/) ip = $i
+            }
+            if (email != "") printf " %-20s %-25s %-20s\n", email, ip, ts
+        }' | tail -n 20
+        echo -e " ${CYAN}──────────────────────────────────────────────────────────────${NC}"
+    else
+        echo -e " ${RED}File log tidak ditemukan: $LOG_FILE${NC}"
+    fi
+
+    echo ""
+    echo -e " ${YELLOW}User aktif di database (status=active, diurutkan quota terbesar):${NC}"
+    echo ""
+    printf " %-18s %-14s %-8s %-12s\n" "Username" "Quota Dipakai" "IP Lim" "Expired"
+    echo -e " ${CYAN}──────────────────────────────────────────────────────────────${NC}"
+    sqlite3 "$DATABASE" \
+        "SELECT username, quota_used, ip_limit, expired_at FROM xray_users WHERE protocol='$PROTO' AND status='active' ORDER BY quota_used DESC LIMIT 20" | \
+    while IFS='|' read -r UN QU IPN EXP; do
+        printf " %-18s %-14s %-8s %-12s\n" "$UN" "${QU:-0}GB" "$IPN" "$EXP"
+    done
+    echo -e " ${CYAN}──────────────────────────────────────────────────────────────${NC}"
+
+    echo ""
+    echo -ne " ${YELLOW}[Enter] Kembali...${NC}"; read -r
+    xray_menu "$PROTO"
+}
+
+# ── Auto-lock user Xray yang quota habis
+xray_check_quota_lock() {
+    sqlite3 "$DATABASE" \
+        "SELECT username, uuid, protocol FROM xray_users WHERE status='active' AND quota_gb > 0 AND quota_used >= quota_gb" 2>/dev/null | \
+    while IFS='|' read -r USERNAME UUID PROTO; do
+        remove_xray_client "$PROTO" "$UUID"
+        sqlite3 "$DATABASE" \
+            "UPDATE xray_users SET status='locked' WHERE username='$USERNAME' AND protocol='$PROTO'"
+        systemctl restart xray-skynet 2>/dev/null || true
+        echo "[QUOTA_LOCK] $PROTO user $USERNAME quota habis, akun di-lock"
+    done
+}
+
+# ── Auto-lock user Xray yang melebihi IP limit
+xray_check_ip_lock() {
+    local PROTO=$1
+    local LOG_FILE="/var/log/xray/access.log"
+    [[ ! -f "$LOG_FILE" ]] && return
+
+    sqlite3 "$DATABASE" \
+        "SELECT username, uuid, ip_limit FROM xray_users WHERE protocol='$PROTO' AND status='active'" 2>/dev/null | \
+    while IFS='|' read -r USERNAME UUID IP_LIMIT; do
+        ACTIVE_COUNT=$(tail -n 2000 "$LOG_FILE" 2>/dev/null | grep "email: $USERNAME" | awk '{
+            for(i=1;i<=NF;i++) {
+                if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$/) print $i
+            }
+        }' | cut -d: -f1 | sort -u | wc -l)
+        if [[ "$ACTIVE_COUNT" -gt "$IP_LIMIT" ]]; then
+            remove_xray_client "$PROTO" "$UUID"
+            sqlite3 "$DATABASE" \
+                "UPDATE xray_users SET status='locked' WHERE username='$USERNAME' AND protocol='$PROTO'"
+            systemctl restart xray-skynet 2>/dev/null || true
+            echo "[IP_LOCK] $PROTO user $USERNAME melebihi IP limit ($ACTIVE_COUNT/$IP_LIMIT), akun di-lock"
+        fi
+    done
+}
+
 # ── Menu Xray
 xray_menu() {
     local PROTO=$1
@@ -496,6 +585,7 @@ xray_menu() {
     echo -e " ${GREEN}8.)${NC}  Unlock Account"
     echo -e " ${GREEN}9.)${NC}  Edit Limit IP"
     echo -e " ${GREEN}10.)${NC} Edit Bandwidth/Quota"
+    echo -e " ${GREEN}11.)${NC} Monitor Login Aktif"
     echo -e " ${RED}x.)${NC}  Kembali"
     echo ""
     echo -ne " ${YELLOW}Pilihan:${NC} "; read -r choice
@@ -511,6 +601,7 @@ xray_menu() {
         8)  xray_lock "$PROTO" "unlock" ;;
         9)  xray_edit_ip_limit "$PROTO" ;;
         10) xray_edit_bandwidth "$PROTO" ;;
+        11) xray_monitor_login "$PROTO" ;;
         x|X) source /opt/skynet/menu.sh; show_main_menu ;;
         *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1; xray_menu "$PROTO" ;;
     esac
