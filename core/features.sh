@@ -80,7 +80,7 @@ features_menu() {
     read -rp "Pilihan: " c
     case "$c" in
       23) feature_menu23_set_lock_duration ;;
-      22) source /opt/skynet/menu.sh; main_menu; return ;;
+      22) main_menu; return ;;
       x|X) exit 0 ;;
       *) sleep 1 ;;
     esac
