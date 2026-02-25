@@ -125,7 +125,15 @@ configure_openssh() {
     log "Mengkonfigurasi OpenSSH..."
     cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 
-    cat > /etc/ssh/sshd_config << 'EOF'
+    # Ubuntu 24.04 (OpenSSH 9.x) removed ChallengeResponseAuthentication
+    local KBD_AUTH_OPT
+    if [[ "$VERSION_ID" == "24.04" ]]; then
+        KBD_AUTH_OPT="KbdInteractiveAuthentication no"
+    else
+        KBD_AUTH_OPT="ChallengeResponseAuthentication no"
+    fi
+
+    cat > /etc/ssh/sshd_config << EOF
 # SKYNET - OpenSSH Configuration
 Port 22
 Port 2222
@@ -137,7 +145,7 @@ PermitRootLogin yes
 PubkeyAuthentication yes
 PasswordAuthentication yes
 PermitEmptyPasswords no
-ChallengeResponseAuthentication no
+$KBD_AUTH_OPT
 UsePAM yes
 
 # Security
@@ -491,7 +499,7 @@ socket = l:TCP_NODELAY=1
 socket = r:TCP_NODELAY=1
 
 [dropbear-ssl]
-accept  = 443
+accept  = 444
 connect = 127.0.0.1:442
 cert    = /etc/stunnel/stunnel.pem
 
@@ -528,9 +536,11 @@ install_badvpn() {
     apt-get install -y cmake
 
     cd /tmp
-    git clone https://github.com/ambrop72/badvpn.git badvpn 2>/dev/null || \
-        wget -O badvpn.zip https://github.com/ambrop72/badvpn/archive/refs/heads/master.zip && \
-        unzip badvpn.zip && mv badvpn-master badvpn
+    if ! git clone https://github.com/ambrop72/badvpn.git badvpn 2>/dev/null; then
+        wget -O badvpn.zip https://github.com/ambrop72/badvpn/archive/refs/heads/master.zip
+        unzip badvpn.zip
+        mv badvpn-master badvpn
+    fi
 
     mkdir -p /tmp/badvpn/build
     cd /tmp/badvpn/build
@@ -572,7 +582,8 @@ configure_ufw() {
     ufw allow 22/tcp    # SSH
     ufw allow 2222/tcp  # SSH alt
     ufw allow 80/tcp    # HTTP
-    ufw allow 443/tcp   # HTTPS / Stunnel
+    ufw allow 443/tcp   # HTTPS
+    ufw allow 444/tcp   # Stunnel (Dropbear SSL)
     ufw allow 109/tcp   # Dropbear
     ufw allow 442/tcp   # Dropbear SSL
     ufw allow 777/tcp   # Stunnel SSH
@@ -1003,7 +1014,7 @@ main() {
     echo "║  Domain    : $DOMAIN"
     echo "║  SSH       : Port 22, 2222"
     echo "║  Dropbear  : Port 442, 109"
-    echo "║  Stunnel   : Port 443, 777"
+    echo "║  Stunnel   : Port 444, 777"
     echo "║  HTTPS     : Port 443 (TLS)"
     echo "║  BadVPN    : Port 7300"
     echo "║  API       : http://127.0.0.1:8080"
