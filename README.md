@@ -11,7 +11,7 @@
 ```bash
 # Download dan extract
 cd /root
-git clone https://github.com/yourusername/skynet.git
+git clone https://github.com/evit2601-del/skynet.git
 cd skynet
 
 # Jalankan installer
