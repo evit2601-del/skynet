@@ -201,7 +201,18 @@ install_xray() {
     log "Menginstall Xray-core terbaru..."
 
     # Download installer resmi Xray
-    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+    if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install; then
+        err "Gagal mendownload installer Xray!"
+        log "Mencoba metode alternatif..."
+        
+        # Alternatif: install manual
+        XRAY_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep tag_name | cut -d '"' -f 4)
+        wget -O /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip"
+        unzip -o /tmp/xray.zip -d /tmp/xray
+        mv /tmp/xray/xray /usr/local/bin/
+        chmod +x /usr/local/bin/xray
+        rm -rf /tmp/xray /tmp/xray.zip
+    fi
 
     # Verifikasi instalasi
     if ! command -v xray &> /dev/null; then
@@ -212,11 +223,17 @@ install_xray() {
     XRAY_VER=$(xray version | head -1)
     log "Xray berhasil diinstall: $XRAY_VER"
 
-    # Buat direktori config
+    # Buat direktori config dan log
     mkdir -p /usr/local/etc/xray
+    mkdir -p /var/log/xray
 
-    # Salin config template (akan di-generate saat setup domain)
-    cp /opt/skynet/config/xray.json /usr/local/etc/xray/config.json 2>/dev/null || true
+    # Salin config template dari /opt/skynet/config/xray.json
+    if [[ -f /opt/skynet/config/xray.json ]]; then
+        cp /opt/skynet/config/xray.json /usr/local/etc/xray/config.json
+        log "Config template xray berhasil disalin."
+    else
+        log "WARNING: Template xray.json tidak ditemukan, akan di-generate saat setup domain."
+    fi
 }
 
 # ── Generate konfigurasi Xray
@@ -360,7 +377,38 @@ configure_nginx() {
     # Hapus config default
     rm -f /etc/nginx/sites-enabled/default
 
-    # Buat config Skynet
+    # Buat temporary config tanpa SSL dulu (untuk certbot)
+    cat > /etc/nginx/sites-available/skynet-temp << EOF
+# SKYNET - Temporary HTTP Configuration (untuk certbot)
+server {
+    listen 80;
+    server_name $DOMAIN;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+    
+    location / {
+        return 200 'SKYNET Server';
+        add_header Content-Type text/plain;
+    }
+}
+EOF
+
+    ln -sf /etc/nginx/sites-available/skynet-temp /etc/nginx/sites-enabled/skynet-temp
+    nginx -t && systemctl reload nginx
+    log "Nginx temporary config berhasil dibuat."
+}
+
+# ── Konfigurasi Nginx dengan SSL (setelah certbot)
+configure_nginx_ssl() {
+    local DOMAIN=$1
+    log "Mengkonfigurasi Nginx SSL untuk domain: $DOMAIN..."
+
+    # Hapus temporary config
+    rm -f /etc/nginx/sites-enabled/skynet-temp
+
+    # Buat config Skynet dengan SSL
     cat > /etc/nginx/sites-available/skynet << EOF
 # SKYNET - Nginx Configuration
 
@@ -460,7 +508,7 @@ EOF
 
     ln -sf /etc/nginx/sites-available/skynet /etc/nginx/sites-enabled/skynet
     nginx -t && systemctl reload nginx
-    log "Nginx berhasil dikonfigurasi."
+    log "Nginx SSL berhasil dikonfigurasi."
 }
 
 # ── Install SSL dengan Let's Encrypt
@@ -897,6 +945,37 @@ EOF
 deploy_scripts() {
     log "Deploy scripts ke /opt/skynet/..."
 
+    # Tentukan source directory (lokasi saat ini atau dari GitHub)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
+    # Copy semua file dari source ke /opt/skynet
+    log "Copying files from $SCRIPT_DIR to /opt/skynet..."
+    
+    # Copy core scripts
+    if [[ -d "$SCRIPT_DIR/core" ]]; then
+        cp -r "$SCRIPT_DIR/core"/* /opt/skynet/core/ 2>/dev/null || true
+    fi
+    
+    # Copy API
+    if [[ -d "$SCRIPT_DIR/api" ]]; then
+        cp -r "$SCRIPT_DIR/api"/* /opt/skynet/api/ 2>/dev/null || true
+    fi
+    
+    # Copy Bot
+    if [[ -d "$SCRIPT_DIR/bot" ]]; then
+        cp -r "$SCRIPT_DIR/bot"/* /opt/skynet/bot/ 2>/dev/null || true
+    fi
+    
+    # Copy config templates
+    if [[ -d "$SCRIPT_DIR/config" ]]; then
+        cp -r "$SCRIPT_DIR/config"/* /opt/skynet/config/ 2>/dev/null || true
+    fi
+    
+    # Copy menu.sh
+    if [[ -f "$SCRIPT_DIR/menu.sh" ]]; then
+        cp "$SCRIPT_DIR/menu.sh" /opt/skynet/menu.sh
+    fi
+
     # Pastikan semua script bisa dieksekusi
     find /opt/skynet -name "*.sh" -exec chmod +x {} \;
     find /opt/skynet -name "*.py" -exec chmod 644 {} \;
@@ -915,13 +994,26 @@ setup_motd() {
     # Disable MOTD bawaan Ubuntu
     chmod -x /etc/update-motd.d/* 2>/dev/null || true
 
+    # Buat script MOTD di profile.d
     cat > /etc/profile.d/skynet-motd.sh << 'MOTDEOF'
 #!/bin/bash
 # SKYNET MOTD - tampil saat login
-[[ -f /opt/skynet/menu.sh ]] && /opt/skynet/menu.sh motd
+if [[ -f /opt/skynet/menu.sh ]]; then
+    bash /opt/skynet/menu.sh motd
+else
+    echo "SKYNET installed. Run 'menu' to access panel."
+fi
 MOTDEOF
 
     chmod +x /etc/profile.d/skynet-motd.sh
+    
+    # Tambahkan ke .bashrc untuk root
+    if ! grep -q "skynet-motd" /root/.bashrc 2>/dev/null; then
+        echo "" >> /root/.bashrc
+        echo "# SKYNET MOTD" >> /root/.bashrc
+        echo "[[ -f /etc/profile.d/skynet-motd.sh ]] && source /etc/profile.d/skynet-motd.sh" >> /root/.bashrc
+    fi
+    
     log "MOTD berhasil dikonfigurasi."
 }
 
@@ -974,6 +1066,7 @@ main() {
 
     # Update domain ke database setelah init
     create_directories
+    deploy_scripts  # Deploy scripts dulu sebelum install yang lain
     install_base_packages
     install_python_deps
     init_database
@@ -981,8 +1074,9 @@ main() {
     configure_dropbear
     install_xray
     generate_xray_config "$DOMAIN"
+    configure_nginx "$DOMAIN"  # Buat nginx config temporary dulu
     install_ssl "$DOMAIN" "$EMAIL"
-    configure_nginx "$DOMAIN"
+    configure_nginx_ssl "$DOMAIN"  # Konfigurasi nginx dengan SSL
     configure_stunnel
     install_badvpn
     configure_ufw
@@ -994,7 +1088,6 @@ main() {
     create_bot_service
     create_monitor_service
     create_settings_conf "$DOMAIN"
-    deploy_scripts
     setup_motd
 
     # Update domain di database
@@ -1005,6 +1098,22 @@ main() {
     log "Menjalankan semua service..."
     systemctl start xray-skynet
     systemctl start skynet-api
+    
+    # Verifikasi services
+    sleep 3
+    XRAY_STATUS=$(systemctl is-active xray-skynet 2>/dev/null || echo "failed")
+    API_STATUS=$(systemctl is-active skynet-api 2>/dev/null || echo "failed")
+    
+    if [[ "$XRAY_STATUS" != "active" ]]; then
+        err "Xray service gagal start! Cek: journalctl -u xray-skynet -n 50"
+        log "Mencoba restart Xray..."
+        systemctl restart xray-skynet
+        sleep 2
+    fi
+    
+    if [[ "$API_STATUS" != "active" ]]; then
+        err "API service gagal start! Cek: journalctl -u skynet-api -n 50"
+    fi
 
     echo ""
     echo -e "${GREEN}${BOLD}"
@@ -1019,6 +1128,10 @@ main() {
     echo "║  BadVPN    : Port 7300"
     echo "║  API       : http://127.0.0.1:8080"
     echo "╠══════════════════════════════════════════════════════╣"
+    echo "║  Status Services:"
+    echo "║  - Xray    : $XRAY_STATUS"
+    echo "║  - API     : $API_STATUS"
+    echo "╠══════════════════════════════════════════════════════╣"
     echo "║  Ketik 'menu' untuk membuka panel                    ║"
     echo "╚══════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -1026,6 +1139,12 @@ main() {
     API_KEY=$(sqlite3 /opt/skynet/database/users.db "SELECT value FROM settings WHERE key='api_key'")
     echo -e "${YELLOW}API Key: ${GREEN}$API_KEY${NC}"
     echo -e "${YELLOW}Simpan API Key ini dengan aman!${NC}"
+    echo ""
+    echo -e "${CYAN}Untuk troubleshooting:${NC}"
+    echo -e "  - Cek log Xray  : journalctl -u xray-skynet -f"
+    echo -e "  - Cek log API   : journalctl -u skynet-api -f"
+    echo -e "  - Restart Xray  : systemctl restart xray-skynet"
+    echo -e "  - Test Xray     : xray -test -config /usr/local/etc/xray/config.json"
 }
 
 main "$@"

@@ -3,7 +3,14 @@
 # SKYNET TUNNELING — MENU UTAMA
 # ============================================================
 
-source /opt/skynet/config/settings.conf 2>/dev/null || true
+# Load config
+if [[ -f /opt/skynet/config/settings.conf ]]; then
+    source /opt/skynet/config/settings.conf
+fi
+
+# Set default values jika tidak ada di config
+DATABASE="${DATABASE:-/opt/skynet/database/users.db}"
+SKYNET_DIR="${SKYNET_DIR:-/opt/skynet}"
 
 # ── Warna
 RED='\033[0;31m'

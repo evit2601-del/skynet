@@ -4,15 +4,24 @@
 - Ubuntu 20.04 / 22.04 / 24.04
 - Domain yang sudah pointing ke IP VPS
 - Akses root
+- Port 80 dan 443 harus terbuka (untuk SSL)
 
 ## Instalasi
 
 ```bash
-git clone https://github.com/evit2601-del/skynet.git /opt/skynet
-cd /opt/skynet
+# Download dan extract
+cd /root
+git clone https://github.com/yourusername/skynet.git
+cd skynet
+
+# Jalankan installer
 chmod +x install.sh
 bash install.sh
 ```
+
+Selama instalasi, Anda akan diminta:
+1. **Domain VPS** (contoh: vpn.domain.com)
+2. **Email untuk SSL** (untuk Let's Encrypt)
 
 ## Setelah Install
 
@@ -22,6 +31,48 @@ menu
 
 # Atau langsung
 bash /opt/skynet/menu.sh
+```
+
+## Troubleshooting
+
+### Xray Tidak Jalan
+
+```bash
+# Cek status
+systemctl status xray-skynet
+
+# Cek log
+journalctl -u xray-skynet -n 50
+
+# Test konfigurasi
+xray -test -config /usr/local/etc/xray/config.json
+
+# Restart
+systemctl restart xray-skynet
+```
+
+### SSL Error
+
+```bash
+# Pastikan domain sudah pointing ke IP server
+ping vpn.domain.com
+
+# Ulangi install SSL
+certbot certonly --standalone -d vpn.domain.com
+
+# Restart nginx
+systemctl restart nginx
+```
+
+### Database Error
+
+```bash
+# Cek database
+sqlite3 /opt/skynet/database/users.db "SELECT * FROM settings;"
+
+# Re-init database jika perlu
+cd /opt/skynet
+bash install.sh  # Akan detect existing installation
 ```
 
 ## Port yang Digunakan
