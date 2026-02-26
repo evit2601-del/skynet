@@ -1,5 +1,24 @@
 # 🚀 SKYNET TUNNELING — Panduan Lengkap
 
+> **⚠️ Service not found?** Lihat [QUICKSTART.md](QUICKSTART.md) untuk solusi cepat!
+
+---
+
+## 🔥 Quick Fix (Jika ada error)
+
+```bash
+# Error: "xray-skynet.service could not be found"
+bash fix-xray.sh
+
+# Verifikasi instalasi
+bash check.sh
+
+# Akses menu
+menu
+```
+
+---
+
 ## Persyaratan
 - Ubuntu 20.04 / 22.04 / 24.04
 - Domain yang sudah pointing ke IP VPS
@@ -11,7 +30,7 @@
 ```bash
 # Download dan extract
 cd /root
-git clone https://github.com/evit2601-del/skynet.git
+git clone https://github.com/yourusername/skynet.git
 cd skynet
 
 # Jalankan installer
@@ -22,6 +41,19 @@ bash install.sh
 Selama instalasi, Anda akan diminta:
 1. **Domain VPS** (contoh: vpn.domain.com)
 2. **Email untuk SSL** (untuk Let's Encrypt)
+
+### Jika Instalasi Gagal
+
+```bash
+# Gunakan quick fix untuk Xray service
+bash fix-xray.sh
+
+# Atau setup manual step-by-step
+bash manual-setup.sh
+
+# Verifikasi instalasi
+bash check.sh
+```
 
 ## Setelah Install
 
@@ -35,13 +67,28 @@ bash /opt/skynet/menu.sh
 
 ## Troubleshooting
 
-### Xray Tidak Jalan
+> **📖 Lihat [TROUBLESHOOTING.md](TROUBLESHOOTING.md) untuk panduan lengkap!**
+
+### Service Not Found Error
+
+Jika `systemctl status xray-skynet` menunjukkan "could not be found":
+
+```bash
+# Quick fix
+chmod +x fix-xray.sh
+bash fix-xray.sh
+
+# Atau manual setup
+bash manual-setup.sh
+```
+
+### Xray Service OFF/Not Running
 
 ```bash
 # Cek status
 systemctl status xray-skynet
 
-# Cek log
+# Cek log error
 journalctl -u xray-skynet -n 50
 
 # Test konfigurasi

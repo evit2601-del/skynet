@@ -1,53 +1,46 @@
-# 🚀 SKYNET TUNNELING — Panduan Lengkap
+#!/bin/bash
+# SKYNET - Quick Runner Script
+# Shortcut untuk menjalankan berbagai tools
 
-## Persyaratan
-- Ubuntu 20.04 / 22.04 / 24.04
-- Domain yang sudah pointing ke IP VPS
-- Akses root
+case "${1:-}" in
+    install|i)
+        bash install.sh
+        ;;
+    fix|f)
+        bash fix-xray.sh
+        ;;
+    check|c)
+        bash check.sh
+        ;;
+    menu|m)
+        bash menu.sh
+        ;;
+    manual|setup|s)
+        bash manual-setup.sh
+        ;;
+    quick|q)
+        bash quick-install.sh
+        ;;
+    *)
+        echo "SKYNET Quick Runner"
+        echo ""
+        echo "Usage: bash r [command]"
+        echo ""
+        echo "Commands:"
+        echo "  i, install  - Run full installer"
+        echo "  f, fix      - Fix Xray service"
+        echo "  c, check    - Check installation"
+        echo "  m, menu     - Open menu"
+        echo "  s, setup    - Manual setup wizard"
+        echo "  q, quick    - Quick installer"
+        echo ""
+        echo "Examples:"
+        echo "  bash r fix"
+        echo "  bash r check"
+        echo "  bash r menu"
+        ;;
+esac
 
-## Instalasi
-
-```bash
-git clone https://github.com/yourrepo/skynet.git /opt/skynet
-cd /opt/skynet
-chmod +x install.sh
-bash install.sh
-```
-
-## Setelah Install
-
-```bash
-# Buka panel menu
-menu
-
-# Atau langsung
-bash /opt/skynet/menu.sh
-```
-
-## Port yang Digunakan
-
-| Service     | Port     |
-|-------------|----------|
-| SSH         | 22, 2222 |
-| Dropbear    | 442, 109 |
-| Stunnel SSH | 777      |
-| HTTPS/TLS   | 443      |
-| HTTP        | 80       |
-| BadVPN UDP  | 7300     |
-| REST API    | 8080 (lokal) |
-
-## API Usage
-
-```bash
-# Contoh: Create SSH user via API
-curl -X POST http://localhost:8080/create-user \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"pass123","days":30,"ip_limit":2,"quota_gb":10}'
-
-# Check user
-curl -G http://localhost:8080/check-user \
-  -H "X-API-Key: YOUR_API_KEY" \
   --data-urlencode "username=testuser" \
   --data-urlencode "user_type=ssh"
 
