@@ -10,11 +10,24 @@
 # Error: "xray-skynet.service could not be found"
 bash fix-xray.sh
 
+# Xray status STOPPED (tidak jalan)
+bash autofix-xray.sh
+
+# Diagnostic lengkap
+bash diagnose-xray.sh
+
 # Verifikasi instalasi
 bash check.sh
 
 # Akses menu
 menu
+```
+
+**Shortcut command:**
+```bash
+bash r autofix    # Auto-fix Xray
+bash r diagnose   # Diagnostic tool
+bash r check      # Check installation
 ```
 
 ---
@@ -30,7 +43,7 @@ menu
 ```bash
 # Download dan extract
 cd /root
-git clone https://github.com/evit2601-del/skynet.git
+git clone https://github.com/yourusername/skynet.git
 cd skynet
 
 # Jalankan installer

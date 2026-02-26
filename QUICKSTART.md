@@ -19,6 +19,33 @@ Script ini akan:
 
 ---
 
+## 🔴 Xray Status: STOPPED (Service ada tapi tidak jalan)
+
+**Solusi Auto-Fix:**
+
+```bash
+cd ~/skynet
+chmod +x autofix-xray.sh
+bash autofix-xray.sh
+```
+
+Script ini otomatis:
+- ✅ Cek & fix config
+- ✅ Kill process yang conflict
+- ✅ Fix permissions
+- ✅ Restart service
+- ✅ Verifikasi hasilnya
+
+**Jika masih gagal, jalankan diagnostic:**
+
+```bash
+bash diagnose-xray.sh
+```
+
+Ini akan menunjukkan error detail dan solusi spesifik.
+
+---
+
 ## 📋 Installation Checklist
 
 Setelah run `fix-xray.sh`, verifikasi:

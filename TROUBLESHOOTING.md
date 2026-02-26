@@ -40,6 +40,140 @@ journalctl -u xray-skynet -n 50
 
 ---
 
+## Xray Status: STOPPED (Service ada tapi tidak jalan) ⚠️
+
+**Ini adalah masalah paling umum!**
+
+### Solusi Tercepat - Auto Fix:
+
+```bash
+cd ~/skynet
+chmod +x autofix-xray.sh
+bash autofix-xray.sh
+```
+
+Script ini akan otomatis:
+1. Test config validity
+2. Regenerate config jika error
+3. Kill conflicting processes
+4. Fix file permissions
+5. Restart service
+6. Show hasil verifikasi
+
+### Jika Auto-Fix Gagal - Run Diagnostic:
+
+```bash
+bash diagnose-xray.sh
+```
+
+Diagnostic tool akan:
+- Cek setiap komponen Xray
+- Tampilkan error spesifik
+- Berikan solusi untuk setiap masalah
+- Attempt to start service
+- Show detail logs
+
+### Manual Troubleshooting:
+
+#### 1. Cek Log Error Detail:
+```bash
+# Lihat 50 baris terakhir
+journalctl -u xray-skynet -n 50 --no-pager
+
+# Follow live log
+journalctl -u xray-skynet -f
+
+# Cek error log Xray
+tail -f /var/log/xray/error.log
+```
+
+#### 2. Test Config Validity:
+```bash
+xray -test -config /usr/local/etc/xray/config.json
+```
+
+Jika ada error:
+```bash
+# Regenerate dari template
+cp /opt/skynet/config/xray.json /usr/local/etc/xray/config.json
+systemctl restart xray-skynet
+```
+
+#### 3. Check Port Conflicts:
+```bash
+# Cek port yang dibutuhkan
+netstat -tulpn | grep '10086\|10087\|10088'
+
+# Atau dengan ss
+ss -tulpn | grep '10086\|10087\|10088'
+```
+
+Jika port sudah digunakan:
+```bash
+# Lihat process ID
+netstat -tulpn | grep 10086
+
+# Kill process (ganti <PID> dengan nomor yang muncul)
+kill -9 <PID>
+
+# Restart xray
+systemctl restart xray-skynet
+```
+
+#### 4. Fix Permissions:
+```bash
+chmod +x /usr/local/bin/xray
+chown root:root /usr/local/etc/xray/config.json
+chmod 644 /usr/local/etc/xray/config.json
+mkdir -p /var/log/xray
+chmod 755 /var/log/xray
+systemctl restart xray-skynet
+```
+
+#### 5. Try Manual Start (untuk debug):
+```bash
+# Stop service dulu
+systemctl stop xray-skynet
+
+# Run manual (akan tampilkan error langsung)
+xray run -config /usr/local/etc/xray/config.json
+
+# Tekan Ctrl+C untuk stop
+# Fix error yang muncul, lalu:
+systemctl start xray-skynet
+```
+
+### Common Error Messages & Fixes:
+
+#### Error: "failed to parse config"
+```bash
+# Config file corrupt atau format salah
+cp /opt/skynet/config/xray.json /usr/local/etc/xray/config.json
+systemctl restart xray-skynet
+```
+
+#### Error: "address already in use"
+```bash
+# Port conflict
+pkill -9 xray
+systemctl restart xray-skynet
+```
+
+#### Error: "permission denied"
+```bash
+# Permission issue
+chmod +x /usr/local/bin/xray
+systemctl restart xray-skynet
+```
+
+#### Error: "no such file or directory"
+```bash
+# Missing files
+bash fix-xray.sh
+```
+
+---
+
 ## Service Berjalan Tapi Status OFF
 
 ### Cek Log Error:

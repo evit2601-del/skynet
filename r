@@ -2,12 +2,22 @@
 # SKYNET - Quick Runner Script
 # Shortcut untuk menjalankan berbagai tools
 
+GREEN='\033[0;32m'
+DIM='\033[2m'
+NC='\033[0m'
+
 case "${1:-}" in
     install|i)
         bash install.sh
         ;;
     fix|f)
         bash fix-xray.sh
+        ;;
+    autofix|auto|a)
+        bash autofix-xray.sh
+        ;;
+    diagnose|diag|d)
+        bash diagnose-xray.sh
         ;;
     check|c)
         bash check.sh
@@ -21,23 +31,33 @@ case "${1:-}" in
     quick|q)
         bash quick-install.sh
         ;;
+    help|h)
+        bash help.sh
+        ;;
     *)
         echo "SKYNET Quick Runner"
         echo ""
         echo "Usage: bash r [command]"
         echo ""
         echo "Commands:"
-        echo "  i, install  - Run full installer"
-        echo "  f, fix      - Fix Xray service"
-        echo "  c, check    - Check installation"
-        echo "  m, menu     - Open menu"
-        echo "  s, setup    - Manual setup wizard"
-        echo "  q, quick    - Quick installer"
+        echo "  a, autofix    - Auto-fix Xray issues (RECOMMENDED)"
+        echo "  d, diagnose   - Diagnose Xray problems"
+        echo "  f, fix        - Fix Xray service"
+        echo "  c, check      - Check installation"
+        echo "  h, help       - Show help guide"
+        echo "  m, menu       - Open menu"
+        echo "  s, setup      - Manual setup wizard"
+        echo "  i, install    - Run full installer"
+        echo "  q, quick      - Quick installer"
         echo ""
-        echo "Examples:"
-        echo "  bash r fix"
-        echo "  bash r check"
-        echo "  bash r menu"
+        echo -e "${GREEN}Common workflows:${NC}"
+        echo -e "  ${DIM}If Xray is STOPPED:${NC}"
+        echo "    bash r autofix     # Try this first"
+        echo "    bash r diagnose    # If autofix fails"
+        echo ""
+        echo -e "  ${DIM}For help:${NC}"
+        echo "    bash r help        # Show quick guide"
+        echo ""
         ;;
 esac
 
