@@ -58,6 +58,7 @@ get_system_info() {
     # Status services
     [[ $(systemctl is-active xray-skynet 2>/dev/null) == "active" ]] && XRAY_STATUS="${GREEN}ON${NC}" || XRAY_STATUS="${RED}OFF${NC}"
     [[ $(systemctl is-active ssh 2>/dev/null) == "active" ]] && SSH_STATUS="${GREEN}ON${NC}" || SSH_STATUS="${RED}OFF${NC}"
+    [[ $(systemctl is-active skynet-nkn 2>/dev/null) == "active" ]] && NKN_STATUS="${GREEN}ON${NC}" || NKN_STATUS="${RED}OFF${NC}"
 }
 
 # ── Tampilan MOTD / Dashboard
@@ -92,6 +93,7 @@ show_motd() {
     echo -e " ${DIM}─────────────────────────────────────────────────────${NC}"
     echo -e " ${YELLOW}Xray      :${NC} $XRAY_STATUS"
     echo -e " ${YELLOW}SSH       :${NC} $SSH_STATUS"
+    echo -e " ${YELLOW}NKN Tunnel:${NC} $NKN_STATUS"
 
     echo ""
     echo -e " ${CYAN}ACCOUNT SUMMARY${NC}"
@@ -208,8 +210,8 @@ check_services_menu() {
     clear
     echo -e "${CYAN}${BOLD}━━━━━━━━━━ STATUS SERVICES ━━━━━━━━━━${NC}"
     echo ""
-    services=("ssh" "dropbear" "nginx" "xray-skynet" "fail2ban" "stunnel4" "skynet-bot" "skynet-api")
-    labels=("SSH" "Dropbear" "Nginx" "Xray" "Fail2Ban" "Stunnel" "Bot Telegram" "REST API")
+    services=("ssh" "dropbear" "nginx" "xray-skynet" "fail2ban" "stunnel4" "skynet-bot" "skynet-api" "skynet-nkn")
+    labels=("SSH" "Dropbear" "Nginx" "Xray" "Fail2Ban" "Stunnel" "Bot Telegram" "REST API" "NKN Tunnel")
 
     for i in "${!services[@]}"; do
         STATUS=$(systemctl is-active "${services[$i]}" 2>/dev/null)
